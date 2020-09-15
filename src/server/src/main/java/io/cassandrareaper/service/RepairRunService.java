@@ -216,12 +216,25 @@ public final class RepairRunService {
       Segment segment,
       String keyspace) throws ReaperException {
 
-    JmxProxy jmxConnection = clusterFacade.connect(cluster);
-    // when hosts are coming up or going down, this method can throw an UndeclaredThrowableException
-    Collection<String> nodes = clusterFacade.tokenRangeToEndpoint(cluster, keyspace, segment);
-    Map<String, String> dcByNode = Maps.newHashMap();
-    nodes.forEach(node -> dcByNode.put(node, EndpointSnitchInfoProxy.create(jmxConnection).getDataCenter(node)));
-    return dcByNode;
+    final int maxAttempts = 5;
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        JmxProxy jmxConnection = clusterFacade.connect(cluster);
+        // when hosts are coming up or going down, this method can throw an UndeclaredThrowableException
+        Collection<String> nodes = clusterFacade.tokenRangeToEndpoint(cluster, keyspace, segment);
+        Map<String, String> dcByNode = Maps.newHashMap();
+        nodes.forEach(node -> dcByNode.put(node, EndpointSnitchInfoProxy.create(jmxConnection).getDataCenter(node)));
+        return dcByNode;
+      } catch (RuntimeException e) {
+        if (attempt < maxAttempts - 1) {
+          LOG.warn("Failed getting replicas for token range {}. Attempt {} of {}",
+              segment.getBaseRange(), attempt + 1, maxAttempts, e);
+        }
+      }
+    }
+
+    throw new ReaperException(String.format("Failed getting replicas for token range (%s, %s)",
+        segment.getBaseRange().getStart(), segment.getBaseRange().getEnd()));
   }
 
   static int computeGlobalSegmentCount(

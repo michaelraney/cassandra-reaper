@@ -747,19 +747,6 @@ final class SegmentRunner implements RepairStatusHandler, Runnable {
         nodes);
   }
 
-  private Map<String, String> getDCsByNodeForRepairSegment(
-      JmxProxy coordinator,
-      Cluster cluster,
-      RepairSegment segment,
-      String keyspace) {
-
-    // when hosts are coming up or going down, this method can throw an UndeclaredThrowableException
-    Collection<String> nodes = clusterFacade.tokenRangeToEndpoint(cluster, keyspace, segment.getTokenRange());
-    Map<String, String> dcByNode = Maps.newHashMap();
-    nodes.forEach(node -> dcByNode.put(node, EndpointSnitchInfoProxy.create(coordinator).getDataCenter(node)));
-    return dcByNode;
-  }
-
   private void storeNodeMetrics(NodeMetrics metrics) {
     assert context.storage instanceof IDistributedStorage;
     if (DatacenterAvailability.ALL != context.config.getDatacenterAvailability()) {

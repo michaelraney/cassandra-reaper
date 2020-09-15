@@ -111,7 +111,6 @@ public final class RepairSegment {
     return endTime;
   }
 
-  @Nullable
   public Map<String, String> getReplicas() {
     return replicas;
   }
