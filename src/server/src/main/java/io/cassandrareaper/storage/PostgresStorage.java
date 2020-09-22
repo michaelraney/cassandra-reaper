@@ -445,32 +445,20 @@ public class PostgresStorage implements IStorage, IDistributedStorage {
     }
   }
 
-  private Optional<RepairSegment> getNextFreeSegment(UUID runId) {
-    RepairSegment result;
+  @Override
+  public Optional<RepairSegment> getNextFreeSegment(UUID runId) {
+    Collection<RepairSegment> result;
+    Set<String> lockedNodes = getLockedNodesForRun(runId);
     try (Handle h = jdbi.open()) {
       result = getPostgresStorage(h).getNextFreeRepairSegment(UuidUtil.toSequenceId(runId));
-    }
-    return Optional.ofNullable(result);
-  }
+      for (RepairSegment segment:result) {
+        if (Sets.intersection(lockedNodes, segment.getReplicas().keySet()).isEmpty()) {
+          return Optional.ofNullable(segment);
 
-  @Override
-  public Optional<RepairSegment> getNextFreeSegmentInRange(UUID runId, Optional<RingRange> range) {
-    if (range.isPresent()) {
-      RepairSegment result;
-      try (Handle h = jdbi.open()) {
-        IStoragePostgreSql storage = getPostgresStorage(h);
-        if (!range.get().isWrapping()) {
-          result = storage.getNextFreeRepairSegmentInNonWrappingRange(
-              UuidUtil.toSequenceId(runId), range.get().getStart(), range.get().getEnd());
-        } else {
-          result = storage.getNextFreeRepairSegmentInWrappingRange(
-              UuidUtil.toSequenceId(runId), range.get().getStart(), range.get().getEnd());
         }
       }
-      return Optional.ofNullable(result);
-    } else {
-      return getNextFreeSegment(runId);
     }
+    return Optional.empty();
   }
 
   @Override
@@ -887,23 +875,25 @@ public class PostgresStorage implements IStorage, IDistributedStorage {
   @Override
   public Optional<RepairSegment> getNextFreeSegmentForRanges(
       UUID runId,
-      Optional<RingRange> parallelRange,
       List<RingRange> ranges) {
     List<RepairSegment> segments
         = Lists.<RepairSegment>newArrayList(getRepairSegmentsForRun(runId));
     Collections.shuffle(segments);
+    Set<String> lockedNodes = getLockedNodesForRun(runId);
 
     for (RepairSegment seg : segments) {
-      if (seg.getState().equals(RepairSegment.State.NOT_STARTED) && withinRange(seg, parallelRange)) {
-        for (RingRange range : ranges) {
-          if (segmentIsWithinRange(seg, range)) {
-            LOG.debug(
-                "Segment [{}, {}] is within range [{}, {}]",
-                seg.getStartToken(),
-                seg.getEndToken(),
-                range.getStart(),
-                range.getEnd());
-            return Optional.of(seg);
+      if (seg.getState().equals(RepairSegment.State.NOT_STARTED)) {
+        if (Sets.intersection(lockedNodes, seg.getReplicas().keySet()).isEmpty()) {
+          for (RingRange range : ranges) {
+            if (segmentIsWithinRange(seg, range)) {
+              LOG.debug(
+                  "Segment [{}, {}] is within range [{}, {}]",
+                  seg.getStartToken(),
+                  seg.getEndToken(),
+                  range.getStart(),
+                  range.getEnd());
+              return Optional.of(seg);
+            }
           }
         }
       }
@@ -1174,13 +1164,25 @@ public class PostgresStorage implements IStorage, IDistributedStorage {
   }
 
   @Override
-  public Set<UUID> getLockedNodesForRun(UUID runId) {
+  public Set<UUID> getLockedSegmentsForRun(UUID runId) {
     if (null != jdbi) {
       try (Handle h = jdbi.open()) {
-        List<Long> segmentSequenceIds = getPostgresStorage(h).getLockedNodes(getExpirationTime(leaderTimeout));
+        List<Long> segmentSequenceIds = getPostgresStorage(h).getLockedSegments(getExpirationTime(leaderTimeout));
         return segmentSequenceIds
             .stream()
             .map(id -> UuidUtil.fromSequenceId(id))
+            .collect(Collectors.toSet());
+      }
+    }
+    return Collections.emptySet();
+  }
+
+  public Set<String> getLockedNodesForRun(UUID runId) {
+    if (null != jdbi) {
+      try (Handle h = jdbi.open()) {
+        List<String> nodes = getPostgresStorage(h).getLockedNodes(getExpirationTime(leaderTimeout));
+        return nodes
+            .stream()
             .collect(Collectors.toSet());
       }
     }
