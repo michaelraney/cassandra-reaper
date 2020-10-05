@@ -27,6 +27,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import com.google.common.collect.ImmutableMap;
 
 @JsonDeserialize(builder = Segment.Builder.class)
 public final class Segment {
@@ -45,7 +46,9 @@ public final class Segment {
     if (builder.baseRange != null) {
       this.baseRange = builder.baseRange;
     }
-    this.replicas = builder.replicas;
+    this.replicas = builder.replicas != null
+        ? ImmutableMap.copyOf(builder.replicas)
+        : null;
   }
 
   public RingRange getBaseRange() {

@@ -27,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import org.joda.time.DateTime;
 
 @JsonDeserialize(builder = RepairSegment.Builder.class)
@@ -55,7 +56,9 @@ public final class RepairSegment {
     this.coordinatorHost = builder.coordinatorHost;
     this.startTime = builder.startTime;
     this.endTime = builder.endTime;
-    this.replicas = builder.replicas;
+    this.replicas = builder.replicas != null
+        ? ImmutableMap.copyOf(builder.replicas)
+        : null;
   }
 
   public static Builder builder(Segment tokenRange, UUID repairUnitId) {
