@@ -216,7 +216,7 @@ public final class RepairRunService {
       Segment segment,
       String keyspace) throws ReaperException {
 
-    final int maxAttempts = 5;
+    final int maxAttempts = 2;
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         JmxProxy jmxConnection = clusterFacade.connect(cluster);
