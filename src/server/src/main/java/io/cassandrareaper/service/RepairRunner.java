@@ -200,10 +200,10 @@ final class RepairRunner implements Runnable {
     LOG.debug(
         "Possible parallel repairs : {}",
         Math.min(
-            ranges.size() / ranges.values().iterator().next().size(),
+            Math.max(1, ranges.size() / ranges.values().iterator().next().size()),
             Math.max(1, hostsInRing.keySet().size() / ranges.values().iterator().next().size())));
     return Math.min(
-        ranges.size() / ranges.values().iterator().next().size(),
+        Math.max(1, ranges.size() / ranges.values().iterator().next().size()),
         Math.max(1, hostsInRing.keySet().size() / ranges.values().iterator().next().size()));
   }
 
